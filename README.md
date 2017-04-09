@@ -7,10 +7,19 @@ This is a purescript-pux module that is a player for [MIDI recordings](https://g
 
 The state of the player is initialised whenever the calling program invokes the SetRecording event which tells the player the recording that it should play.
 
-to build
---------
+to build the module
+-------------------
    
    bower install
-   ./build.sh
    
-   and then navigate to /dist/index.html
+   pulp build
+   
+   
+to build the example
+--------------------
+   
+   bower install
+   
+   ./buildExample.sh
+   
+   and then navigate to /dist/index.html   
