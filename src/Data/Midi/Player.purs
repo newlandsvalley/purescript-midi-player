@@ -15,33 +15,30 @@ import CSS.Size (px)
 import Control.Monad.Aff (later')
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Either (Either(..), isLeft, fromRight)
 import Data.Int (toNumber)
 import Data.List (List(..), head, index, length)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
-import Partial.Unsafe (unsafePartial)
-import Prelude (bind, const, negate, not, show, pure, ($), (>), (||), (+), (*), (/))
+import Prelude (bind, const, negate, not, show, pure, ($), (>), (+), (*), (/))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
 import Pux.DOM.HTML (HTML)
 import Pux.DOM.HTML.Attributes (style)
-import Text.Smolder.HTML (div, p, input, progress)
+import Text.Smolder.HTML (div, input, progress)
 import Text.Smolder.HTML.Attributes (type', max, src, value)
 import Text.Smolder.Markup (Attribute, text, (#!), (!))
-
 
 -- import Debug.Trace (trace)
 
 data Event
   = NoOp
-  | SetRecording (Either String Midi.Recording)
+  | SetRecording Midi.Recording
   | StepMidi             -- not called directly but its presence allows a view update
   | PlayMidi Boolean     -- play | pause
   | StopMidi             -- stop and set index to zero
 
 type State =
-  { recording :: Either String Midi.Recording
+  { recording :: Midi.Recording
   , playing :: Boolean
   , eventMax :: Int
   , eventIndex :: Int
@@ -50,26 +47,24 @@ type State =
   , tempo :: Int
   }
 
-initialState :: Int -> State
-initialState max =
-  { recording : (Left "not started")
-  , playing : false
-  , eventIndex : 0
-  , eventMax : max
-  , midiEvent : Nothing
-  , ticksPerBeat : 480
-  , tempo : 1000000   -- this will almost certainly be reset at the start of the MIDI file
-  }
+setState :: Midi.Recording -> State
+setState recording =
+  let
+    max = maxMidiEvents recording
+  in
+    { recording : recording
+    , playing : false
+    , eventIndex : 0
+    , eventMax : max
+    , midiEvent : Nothing
+    , ticksPerBeat : 480
+    , tempo : 1000000   -- this will almost certainly be reset at the start of the MIDI file
+    }
 
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
 foldp (SetRecording recording) state =
-  step $ state { recording = recording
-               , playing = false
-               , eventIndex = 0
-               , eventMax = maxMidiEvents recording
-               , midiEvent = Nothing
-               }
+  step $ setState recording
 foldp StepMidi state =  step state
 foldp (PlayMidi playing) state =
   step $ state { playing = playing }
@@ -78,16 +73,13 @@ foldp (StopMidi) state =
                     , playing = false }
 
 -- | count the number of MIDI events in the recording
-maxMidiEvents :: Either String Midi.Recording -> Int
-maxMidiEvents mr =
-  case mr of
-    Right recording ->
-      let
-        track0 = fromMaybe (Midi.Track Nil) (head (unwrap recording).tracks)
-        trackLength (Midi.Track track) = length track
-      in
-        trackLength track0
-    _ -> 0
+maxMidiEvents :: Midi.Recording -> Int
+maxMidiEvents recording =
+  let
+    track0 = fromMaybe (Midi.Track Nil) (head (unwrap recording).tracks)
+    trackLength (Midi.Track track) = length track
+  in
+    trackLength track0
 
 -- | step through the MIDI events, one by one
 step :: forall e. State -> EffModel State Event (au :: AUDIO | e)
@@ -149,10 +141,10 @@ playEvent event =
 -- | locate the next message in the MIDI track
 locateNextMessage :: State -> Maybe Midi.Message
 locateNextMessage state =
-  if (not state.playing) || (isLeft state.recording) then
+  if (not state.playing) then
     Nothing
   else
-    case unsafePartial $ fromRight state.recording of
+    case state.recording of
       Midi.Recording {header: _, tracks: ts } ->
         case head ts of
           Just (Midi.Track events) ->
@@ -169,13 +161,18 @@ viewNextEvent state =
     Just me ->
       show me
 
+{-
 view :: State -> HTML Event
 view state =
-  if true {- (state.fontLoaded) -} then
+  if true then
     div do
       player state
   else
     p $ text ""
+-}
+view :: State -> HTML Event
+view state =
+  player state
 
 player :: State -> HTML Event
 player state =
@@ -198,8 +195,6 @@ player state =
     capsuleMax =
       show state.eventMax
   in
-    case state.recording of
-      Right midiRecording ->
         div ! playerBlockStyle $ do
           div ! playerBaseStyle ! playerStyle $ do
             progress ! capsuleStyle ! max capsuleMax ! value sliderPos $ do
@@ -209,8 +204,6 @@ player state =
                  #! onClick (const playAction)
               input ! type' "image" ! src stopImg
                  #! onClick (const StopMidi)
-      Left err ->
-        p $ text ""
 
 centreStyle :: Attribute
 centreStyle =

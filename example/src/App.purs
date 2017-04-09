@@ -5,16 +5,16 @@ import Data.Midi as Midi
 import Data.Midi.Player as MidiPlayer
 import Audio.SoundFont (AUDIO, loadRemoteSoundFont)
 import BinaryFileIO.FileIO (FILEIO, Filespec, loadBinaryFile)
-import Data.Maybe (Maybe(..))
 import Data.Either (Either(..))
+import Data.Function (const, ($), (#))
+import Data.Maybe (Maybe(..))
 import Data.Midi.Parser (parse, normalise, translateRunningStatus)
 import Prelude (bind, show, pure, (<>), (<<<))
-import Data.Function (const, ($), (#))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
 import Pux.DOM.HTML (HTML, child)
 import Pux.DOM.HTML.Attributes (style)
-import Text.Smolder.HTML (button, div, h1, input)
+import Text.Smolder.HTML (button, div, h1, input, p)
 import Text.Smolder.HTML.Attributes (type', id, accept)
 import Text.Smolder.Markup (Attribute, text, (#!), (!))
 
@@ -32,7 +32,7 @@ type State =
   { filespec :: Maybe Filespec
   , recording :: Either String Midi.Recording
   , fontLoaded :: Boolean                 -- is the soundfount loaded?
-  , playerState :: MidiPlayer.State
+  , playerState :: Maybe MidiPlayer.State
   }
 
 initialState :: State
@@ -40,10 +40,9 @@ initialState =
   { filespec : Nothing
   , recording : Left "not started"
   , fontLoaded : false
-  , playerState : MidiPlayer.initialState 0
+  , playerState : Nothing
   }
 
--- foldp :: Event -> State -> EffModel State Action
 foldp :: ∀ fx. Event -> State -> EffModel State Event (fileio :: FILEIO, au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
 foldp RequestLoadFonts state =
@@ -68,26 +67,43 @@ foldp (FileLoaded filespec) state =
   let
     newState = processFile filespec state
   in
-    { state : newState
-    , effects :
-      [ do
-          pure $ Just (PlayerEvent (MidiPlayer.SetRecording newState.recording))
-      ]
-    }
+    case newState.recording of
+      Right midiRecording ->
+        { state : newState
+        , effects :
+            [ do
+                pure $ Just (PlayerEvent (MidiPlayer.SetRecording midiRecording))
+            ]
+        }
+      _ ->
+        noEffects newState
+
 foldp (PlayerEvent e) state =
-  MidiPlayer.foldp e state.playerState
-    # mapEffects PlayerEvent
-    # mapState \pst -> state { playerState = pst }
+  case state.playerState of
+    Just pstate ->
+      MidiPlayer.foldp e pstate
+        # mapEffects PlayerEvent
+        # mapState \pst -> state { playerState = Just pst }
+    _ ->
+      noEffects state
 
-
+-- | this needs a bit of clearing up - we're setting player state too many times
 processFile :: Filespec -> State -> State
 processFile filespec state =
   let
-    recording = (translateRunningStatus <<< parse <<< normalise) filespec.contents
+    mrecording = (translateRunningStatus <<< parse <<< normalise) filespec.contents
   in
-    state { filespec =  Just filespec
-          , recording = recording
-          }
+    case mrecording of
+      Right recording ->
+        state { filespec = Just filespec
+              , recording = mrecording
+              , playerState = Just (MidiPlayer.setState recording)
+              }
+      _ ->
+        state { filespec =  Just filespec
+              , recording = mrecording
+              , playerState = Nothing
+              }
 
 fullParse :: String -> String
 fullParse s =
@@ -105,10 +121,18 @@ view state =
        div do
          input ! type' "file" ! id "fileinput" ! accept ".midi"
            #! onChange (const RequestFileUpload)
-         child PlayerEvent MidiPlayer.view $ state.playerState
-
+         viewPlayer state
   else
     button #! onClick (const RequestLoadFonts) $ text "load soundfonts"
+
+-- | only display the player if we have a MIDI recording
+viewPlayer :: State -> HTML Event
+viewPlayer state =
+  case state.playerState of
+    Just pstate ->
+      child PlayerEvent MidiPlayer.view $ pstate
+    _ ->
+      p $ text ""
 
 centreStyle :: Attribute
 centreStyle =
