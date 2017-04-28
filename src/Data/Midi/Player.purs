@@ -1,8 +1,8 @@
 module Data.Midi.Player where
 
 import CSS.TextAlign
-import Data.Midi as Midi
-import Audio.SoundFont (AUDIO, playNote)
+import Data.Midi.HybridPerformance (Melody, MidiPhrase)
+import Audio.SoundFont (AUDIO, playNotes)
 import CSS (color, fromString)
 import CSS.Background (background, backgroundImages)
 import CSS.Border (border, borderRadius, solid)
@@ -15,11 +15,10 @@ import CSS.Size (px)
 import Control.Monad.Aff (later')
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Int (toNumber)
-import Data.List (List(..), head, index, length)
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap)
-import Prelude (bind, const, negate, not, show, pure, ($), (>), (+), (*), (/))
+import Data.Int (round)
+import Data.Array (null, index, length)
+import Data.Maybe (Maybe(..))
+import Prelude (bind, const, negate, not, show, pure, ($), (+), (*), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
 import Pux.DOM.HTML (HTML)
@@ -32,144 +31,80 @@ import Text.Smolder.Markup (Attribute, text, (#!), (!))
 
 data Event
   = NoOp
-  | SetRecording Midi.Recording
-  | StepMidi             -- not called directly but its presence allows a view update
-  | PlayMidi Boolean     -- play | pause
-  | StopMidi             -- stop and set index to zero
+  | SetMelody Melody
+  | StepMelody Number     -- not called directly but its presence allows a view update
+  | PlayMelody Boolean    -- play | pause
+  | StopMelody            -- stop and set index to zero
 
 type State =
-  { recording :: Midi.Recording
+  { melody :: Melody
   , playing :: Boolean
-  , eventMax :: Int
-  , eventIndex :: Int
-  , midiEvent :: Maybe Midi.Event
-  , ticksPerBeat :: Int
-  , tempo :: Int
+  , phraseMax :: Int
+  , phraseIndex :: Int
+  -- , lastPhraseLength :: Number
   }
 
-setState :: Midi.Recording -> State
-setState recording =
+setState :: Melody -> State
+setState melody =
   let
-    max = maxMidiEvents recording
+    max = length melody
   in
-    { recording : recording
+    { melody : melody
     , playing : false
-    , eventIndex : 0
-    , eventMax : max
-    , midiEvent : Nothing
-    , ticksPerBeat : 480
-    , tempo : 1000000   -- this will almost certainly be reset at the start of the MIDI file
+    , phraseMax : max
+    , phraseIndex : 0
     }
 
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
-foldp (SetRecording recording) state =
-  step $ setState recording
-foldp StepMidi state =  step state
-foldp (PlayMidi playing) state =
-  step $ state { playing = playing }
-foldp (StopMidi) state =
-  noEffects $ state { eventIndex = 0
+foldp (SetMelody melody) state =
+  -- step (setState melody) 0.0
+  noEffects $ setState melody
+foldp (StepMelody delay) state =
+  step state delay
+foldp (PlayMelody playing) state =
+  step (state { playing = playing }) 0.0
+  -- noEffects $ state
+foldp (StopMelody) state =
+  noEffects $ state { phraseIndex = 0
                     , playing = false }
 
--- | count the number of MIDI events in the recording
-maxMidiEvents :: Midi.Recording -> Int
-maxMidiEvents recording =
-  let
-    track0 = fromMaybe (Midi.Track Nil) (head (unwrap recording).tracks)
-    trackLength (Midi.Track track) = length track
-  in
-    trackLength track0
-
 -- | step through the MIDI events, one by one
-step :: forall e. State -> EffModel State Event (au :: AUDIO | e)
-step state =
-  case locateNextMessage state of
-    Just (Midi.Message ticks midiEvent) ->
+step :: forall e. State -> Number -> EffModel State Event (au :: AUDIO | e)
+step state delay =
+  case locateNextPhrase state of
+    Just (midiPhrase) ->
       let
-        -- listen for tempo changes
-        tempo =
-          case midiEvent of
-            Midi.Tempo t ->
-              t
-            _ ->
-              state.tempo
+        msDelay = round $ delay * 1000.0
         -- set the new state
         newState =
-          state { eventIndex = state.eventIndex + 1
-                , midiEvent = Just midiEvent
-                , tempo = tempo
-                }
-        -- work out the delay for this message
-        delay =
-          (ticks * tempo)  / (newState.ticksPerBeat * 1000)
+          state { phraseIndex = state.phraseIndex + 1 }
       in
         { state: newState
         , effects:
           [ do
-              done <-
-                if (ticks > 0) then
-                  later' delay $ liftEff (playEvent midiEvent)
-                else
-                  liftEff (playEvent midiEvent)
-              pure (Just StepMidi)
+              nextDelay <-
+                  later' msDelay $ liftEff (playEvent midiPhrase)
+              pure $ Just (StepMelody nextDelay)
           ]
         }
     _ ->
       noEffects state
 
--- | play a MIDI event
--- | only NoteOn events with a nominated pitch produce sound
-playEvent :: forall eff. Midi.Event -> Eff (au :: AUDIO | eff) Number
-playEvent event =
-  case event of
-    Midi.NoteOn channel pitch velocity ->
-      if (pitch > 0) then
-        let
-          maxVolume = 127
-          gain =
-            toNumber velocity / toNumber maxVolume
-          midiNote = { id: pitch, timeOffset: 0.0, duration : 1.0, gain : gain }
-        in
-          playNote midiNote
-      else
-        -- a pitch of 0 is interpreted simply as a rest
-        pure 0.0
-    _ ->
-      pure 0.0
+-- | play a MIDI Phrase (a bunch of MIDI notes)
+-- | only NoteOn events produce sound
+playEvent :: forall eff. MidiPhrase -> Eff (au :: AUDIO | eff) Number
+playEvent midiPhrase =
+  playNotes midiPhrase
 
--- | locate the next message in the MIDI track
-locateNextMessage :: State -> Maybe Midi.Message
-locateNextMessage state =
-  if (not state.playing) then
+-- | locate the next MIDI phrase from the performance
+locateNextPhrase :: State -> Maybe MidiPhrase
+locateNextPhrase state =
+  if (not state.playing) || (null state.melody) then
     Nothing
   else
-    case state.recording of
-      Midi.Recording {header: _, tracks: ts } ->
-        case head ts of
-          Just (Midi.Track events) ->
-            index events (state.eventIndex)
-          _ -> Nothing
+    index state.melody (state.phraseIndex)
 
-
--- | just display the next MIDI event
-viewNextEvent :: State -> String
-viewNextEvent state =
-  case state.midiEvent of
-    Nothing ->
-      ""
-    Just me ->
-      show me
-
-{-
-view :: State -> HTML Event
-view state =
-  if true then
-    div do
-      player state
-  else
-    p $ text ""
--}
 view :: State -> HTML Event
 view state =
   player state
@@ -177,23 +112,23 @@ view state =
 player :: State -> HTML Event
 player state =
   let
-    sliderPos = show state.eventIndex
+    sliderPos = show state.phraseIndex
 
     startImg = "assets/images/play.png"
     stopImg =  "assets/images/stop.png"
     pauseImg = "assets/images/pause.png"
     playAction =
       if state.playing then
-         PlayMidi false
+         PlayMelody false
       else
-         PlayMidi true
+         PlayMelody true
     playButtonImg =
       if state.playing then
         pauseImg
       else
         startImg
     capsuleMax =
-      show state.eventMax
+      show state.phraseMax
   in
         div ! playerBlockStyle $ do
           div ! playerBaseStyle ! playerStyle $ do
@@ -203,7 +138,7 @@ player state =
               input ! type' "image" ! src playButtonImg
                  #! onClick (const playAction)
               input ! type' "image" ! src stopImg
-                 #! onClick (const StopMidi)
+                 #! onClick (const StopMelody)
 
 centreStyle :: Attribute
 centreStyle =
