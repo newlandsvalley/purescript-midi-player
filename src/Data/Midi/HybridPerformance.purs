@@ -10,7 +10,12 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.Int (toNumber)
-import Prelude (bind, map, pure, ($), (*), (+), (-), (/), (>))
+import Prelude (bind, map, pure, ($), (*), (+), (-), (/), (>), (&&))
+
+-- | A hybrid performance is one where we don't attempt to interpret
+-- | every MIDI message individually before re-rendering the player
+-- | but we instead group sequences of MIDI messages into
+-- | (relatively short) phrases and re-render after each phrase
 
 type MidiPhrase = Array MidiNote
 type Melody = Array MidiPhrase
@@ -182,7 +187,12 @@ finaliseNote channel pitch velocity endOffset tstate =
           currentPhrase = finalisedNote : tstate.currentPhrase
         in
           -- split into phrases
-          if (endOffset - tstate.phraseOffset) > phraseSize then
+          -- we do this if the phrase has grown beyond the limit
+          -- and there aren't any other half-built notes left
+          -- which would indicate a chord
+          -- (i.e. the currentNoteMap must be empty)
+          if ((endOffset - tstate.phraseOffset) > phraseSize)
+                && (Map.isEmpty currentNoteMap) then
             tstate { currentNoteMap = currentNoteMap
                    , noteOffset = endOffset
                    , phraseOffset = endOffset
