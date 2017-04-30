@@ -3,7 +3,6 @@ module App where
 import CSS.TextAlign
 import Data.Midi as Midi
 import Data.Midi.Player as MidiPlayer
-import Data.Midi.HybridPerformance (toPerformance)
 import Audio.SoundFont (AUDIO, loadRemoteSoundFont)
 import BinaryFileIO.FileIO (FILEIO, Filespec, loadBinaryFile)
 import Data.Either (Either(..))
@@ -73,12 +72,11 @@ foldp (FileLoaded filespec) state =
         { state : newState
         , effects :
             [ do
-                pure $ Just (PlayerEvent (MidiPlayer.SetMelody (toPerformance midiRecording)))
+                pure $ Just (PlayerEvent (MidiPlayer.SetRecording midiRecording))
             ]
         }
       _ ->
         noEffects newState
-
 foldp (PlayerEvent e) state =
   case state.playerState of
     Just pstate ->
@@ -88,7 +86,7 @@ foldp (PlayerEvent e) state =
     _ ->
       noEffects state
 
--- | this needs a bit of clearing up - we're setting player state too many times
+-- | get the MIDI recording and parse it
 processFile :: Filespec -> State -> State
 processFile filespec state =
   let

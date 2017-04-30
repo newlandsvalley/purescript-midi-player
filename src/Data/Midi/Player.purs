@@ -1,5 +1,5 @@
 module Data.Midi.Player
-  (State, Event (SetMelody), initialState, foldp, view) where
+  (State, Event (SetRecording), initialState, foldp, view) where
 
 import CSS.TextAlign
 import Audio.SoundFont (AUDIO, playNotes)
@@ -18,7 +18,8 @@ import Control.Monad.Eff.Class (liftEff)
 import Data.Array (null, index, length)
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
-import Data.Midi.HybridPerformance (Melody, MidiPhrase)
+import Data.Midi (Recording)
+import Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance)
 import Prelude (bind, const, negate, not, show, pure, ($), (+), (*), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
@@ -32,7 +33,7 @@ import Text.Smolder.Markup (Attribute, text, (#!), (!))
 -- | Player events,  Only SetMelody is exposed.
 data Event
   = NoOp
-  | SetMelody Melody
+  | SetRecording Recording
   | StepMelody Number     -- not called directly but its presence allows a view update
   | PlayMelody Boolean    -- play | pause
   | StopMelody            -- stop and set index to zero
@@ -54,9 +55,10 @@ initialState =
   , phraseIndex : 0
   }
 
-setState :: Melody -> State
-setState melody =
+setRecording :: Recording -> State
+setRecording recording =
   let
+    melody = toPerformance recording
     max = length melody
   in
     { melody : melody
@@ -68,8 +70,8 @@ setState melody =
 -- | the autonomous state update
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
-foldp (SetMelody melody) state =
-  noEffects $ setState melody
+foldp (SetRecording recording) state =
+  noEffects $ setRecording recording
 foldp (StepMelody delay) state =
   step state delay
 foldp (PlayMelody playing) state =

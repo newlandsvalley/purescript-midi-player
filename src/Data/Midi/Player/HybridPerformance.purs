@@ -1,4 +1,4 @@
-module Data.Midi.HybridPerformance (Melody, MidiPhrase, toPerformance) where
+module Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance) where
 
 import Control.Monad.State as ControlState
 import Audio.SoundFont (MidiNote)
