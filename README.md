@@ -9,7 +9,7 @@ not play at tempo.  Instead, phrases of notes are accumulated from the MIDI by t
 of relatively short duration and the view is re-rendered after each phrase.  This gives a reasonable compromise between playing
 the tune at the appropriate tempo and allowing the stop/start buttons to be responsive.
 
-The state of the player is initialised whenever the calling program invokes the SetMelody event which tells the player the melody
+The state of the player is re-initialised whenever the calling program invokes the SetMelody event which tells the player the melody
 (i.e. the set of phrases) that it should play.
 
 to build the module

@@ -98,7 +98,7 @@ processFile filespec state =
       Right recording ->
         state { filespec = Just filespec
               , recording = mrecording
-              , playerState = Just (MidiPlayer.setState (toPerformance recording))
+              , playerState = Just (MidiPlayer.initialState)
               }
       _ ->
         state { filespec =  Just filespec

@@ -1,7 +1,7 @@
-module Data.Midi.Player where
+module Data.Midi.Player
+  (State, Event (SetMelody), initialState, foldp, view) where
 
 import CSS.TextAlign
-import Data.Midi.HybridPerformance (Melody, MidiPhrase)
 import Audio.SoundFont (AUDIO, playNotes)
 import CSS (color, fromString)
 import CSS.Background (background, backgroundImages)
@@ -15,9 +15,10 @@ import CSS.Size (px)
 import Control.Monad.Aff (later')
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
-import Data.Int (round)
 import Data.Array (null, index, length)
+import Data.Int (round)
 import Data.Maybe (Maybe(..))
+import Data.Midi.HybridPerformance (Melody, MidiPhrase)
 import Prelude (bind, const, negate, not, show, pure, ($), (+), (*), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
@@ -27,8 +28,8 @@ import Text.Smolder.HTML (div, input, progress)
 import Text.Smolder.HTML.Attributes (type', max, src, value)
 import Text.Smolder.Markup (Attribute, text, (#!), (!))
 
--- import Debug.Trace (trace)
 
+-- | Player events,  Only SetMelody is exposed.
 data Event
   = NoOp
   | SetMelody Melody
@@ -36,12 +37,21 @@ data Event
   | PlayMelody Boolean    -- play | pause
   | StopMelody            -- stop and set index to zero
 
+-- | the internal state of the player
 type State =
   { melody :: Melody
   , playing :: Boolean
   , phraseMax :: Int
   , phraseIndex :: Int
-  -- , lastPhraseLength :: Number
+  }
+
+-- | the initial state of the player (with no melody to play yet)
+initialState :: State
+initialState =
+  { melody : []
+  , playing : false
+  , phraseMax : 0
+  , phraseIndex : 0
   }
 
 setState :: Melody -> State
@@ -55,10 +65,10 @@ setState melody =
     , phraseIndex : 0
     }
 
+-- | the autonomous state update
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
 foldp (SetMelody melody) state =
-  -- step (setState melody) 0.0
   noEffects $ setState melody
 foldp (StepMelody delay) state =
   step state delay
@@ -105,6 +115,7 @@ locateNextPhrase state =
   else
     index state.melody (state.phraseIndex)
 
+-- | the player widget (start, stop, pause, progress)
 view :: State -> HTML Event
 view state =
   player state
