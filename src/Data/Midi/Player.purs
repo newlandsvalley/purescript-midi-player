@@ -188,6 +188,7 @@ capsuleStyle =
 playerBlockStyle :: Attribute
 playerBlockStyle =
   style do
+    margin (px 10.0) (px 0.0) (px 10.0) (px 0.0)
     background (rgba 0 0 0 0.7)
     border solid (px 1.0) (rgb 0 0 0)
     borderRadius (px 10.0) (px 10.0) (px 10.0) (px 10.0)
