@@ -1,5 +1,5 @@
 module Data.Midi.Player
-  (State, Event (SetRecording), initialState, foldp, view) where
+  (MelodySource, State, Event (SetRecording, SetAbc), initialState, foldp, view) where
 
 import CSS.TextAlign
 import Audio.SoundFont (AUDIO, playNotes)
@@ -15,12 +15,14 @@ import CSS.Size (px)
 import Control.Monad.Aff (later')
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
+import Data.Abc (AbcTune)
+import Data.Abc.Midi (toMidi)
 import Data.Array (null, index, length)
 import Data.Int (round)
 import Data.Maybe (Maybe(..))
 import Data.Midi (Recording)
 import Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance)
-import Prelude (bind, const, negate, not, show, pure, ($), (+), (*), (||))
+import Prelude (bind, const, negate, not, show, pure, (<<<), (==), ($), (+), (*), (&&), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
 import Pux.DOM.HTML (HTML)
@@ -33,14 +35,22 @@ import Text.Smolder.Markup (Attribute, text, (#!), (!))
 -- | Player events,  Only SetMelody is exposed.
 data Event
   = NoOp
-  | SetRecording Recording
-  | StepMelody Number     -- not called directly but its presence allows a view update
-  | PlayMelody Boolean    -- play | pause
-  | StopMelody            -- stop and set index to zero
+  | SetRecording Recording   -- we can get the melody from a MIDI recoding
+  | SetAbc AbcTune           -- or else from an ABC tune
+  | StepMelody Number        -- not called directly but its presence allows a view update
+  | PlayMelody Boolean       -- play | pause
+  | StopMelody               -- stop and set index to zero
+
+-- | the source of the melody
+data MelodySource
+  = ABC AbcTune
+  | MIDI Recording
+  | ABSENT
 
 -- | the internal state of the player
 type State =
-  { melody :: Melody
+  { melodySource :: MelodySource
+  , melody :: Melody
   , playing :: Boolean
   , phraseMax :: Int
   , phraseIndex :: Int
@@ -49,34 +59,65 @@ type State =
 -- | the initial state of the player (with no melody to play yet)
 initialState :: State
 initialState =
-  { melody : []
+  { melodySource : ABSENT
+  , melody : []
   , playing : false
   , phraseMax : 0
   , phraseIndex : 0
   }
 
-setRecording :: Recording -> State
-setRecording recording =
-  let
-    melody = toPerformance recording
-    max = length melody
-  in
-    { melody : melody
-    , playing : false
-    , phraseMax : max
-    , phraseIndex : 0
-    }
+-- | set the source of the melody as a MIDI recording
+setMidiRecording :: Recording -> State -> State
+setMidiRecording recording state =
+  state { melodySource = MIDI recording
+        , melody = []
+        }
+
+-- | set the source of the melody as an ABC tune
+setAbcTune :: AbcTune -> State -> State
+setAbcTune abcTune state =
+  state { melodySource = ABC abcTune
+        , melody = []
+        }
+
+-- | truly establish the melody only once the play button is pressed
+-- | for the first time
+establishMelody :: Boolean -> State -> State
+establishMelody playing state =
+  if (null state.melody) then
+    case state.melodySource of
+      MIDI recording ->
+        let
+          melody = toPerformance recording
+          max = length melody
+        in
+          state { melody = melody, playing = playing, phraseMax = max, phraseIndex = 0 }
+      ABC abcTune ->
+        let
+          melody = (toPerformance <<< toMidi) abcTune
+          max = length melody
+        in
+          state { melody = melody, playing = playing, phraseMax = max, phraseIndex = 0 }
+      ABSENT ->
+        state
+  else
+    state { playing = playing }
 
 -- | the autonomous state update
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
 foldp (SetRecording recording) state =
-  noEffects $ setRecording recording
+  noEffects $ setMidiRecording recording state
+foldp (SetAbc abcTune) state =
+  noEffects $ setAbcTune abcTune state
 foldp (StepMelody delay) state =
   step state delay
 foldp (PlayMelody playing) state =
-  step (state { playing = playing }) 0.0
-  -- noEffects $ state
+  if (playing && state.phraseIndex == 0) then
+    -- actually establish the melody on first reference
+    step (establishMelody playing state) 0.0
+  else
+    step (state { playing = playing }) 0.0
 foldp (StopMelody) state =
   noEffects $ state { phraseIndex = 0
                     , playing = false }
