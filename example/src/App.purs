@@ -9,7 +9,7 @@ import Data.Either (Either(..))
 import Data.Function (const, ($), (#))
 import Data.Maybe (Maybe(..))
 import Data.Midi.Parser (parse, normalise, translateRunningStatus)
-import Prelude (bind, show, pure, (<>), (<<<))
+import Prelude (bind, discard, pure, (<<<))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
 import Pux.DOM.HTML (HTML, child)
@@ -104,13 +104,6 @@ processFile filespec state =
               , playerState = Nothing
               }
 
-fullParse :: String -> String
-fullParse s =
-  case translateRunningStatus $ parse $ normalise $ s of
-    Left err ->
-      ("Parse error:" <> err)
-    Right midi ->
-      (show midi)
 
 view :: State -> HTML Event
 view state =
