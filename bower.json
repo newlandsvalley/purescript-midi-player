@@ -10,9 +10,9 @@
     "purescript-midi": "https://github.com/newlandsvalley/purescript-midi.git",
     "purescript-soundfonts": "https://github.com/newlandsvalley/purescript-soundfonts.git",
     "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git",
-    "purescript-pux": "^8.7.0"
+    "purescript-pux": "^9.1.0"
   },
   "devDependencies": {
-    "purescript-psci-support": "^2.0.0"
+    "purescript-psci-support": "^3.0.0"
   }
 }

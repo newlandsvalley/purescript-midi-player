@@ -12,17 +12,17 @@ import CSS.Display (display, float, floatLeft, inlineBlock, position, relative)
 import CSS.Geometry (width, height, padding, margin)
 import CSS.Overflow (hidden, overflow)
 import CSS.Size (px)
-import Control.Monad.Aff (later')
+import Control.Monad.Aff (delay)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Class (liftEff)
 import Data.Abc (AbcTune)
 import Data.Abc.Midi (toMidi)
 import Data.Array (null, index, length)
-import Data.Int (round)
 import Data.Maybe (Maybe(..))
+import Data.Time.Duration (Milliseconds(..))
 import Data.Midi (Recording)
 import Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance)
-import Prelude (bind, const, negate, not, show, pure, (<<<), (==), ($), (+), (*), (&&), (||))
+import Prelude (bind, const, discard, negate, not, show, pure, (<<<), (==), ($), (+), (*), (&&), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
 import Pux.DOM.HTML (HTML)
@@ -124,11 +124,11 @@ foldp (StopMelody) state =
 
 -- | step through the MIDI events, one by one
 step :: forall e. State -> Number -> EffModel State Event (au :: AUDIO | e)
-step state delay =
+step state sDelay =
   case locateNextPhrase state of
     Just (midiPhrase) ->
       let
-        msDelay = round $ delay * 1000.0
+        msDelay = sDelay * 1000.0
         -- set the new state
         newState =
           state { phraseIndex = state.phraseIndex + 1 }
@@ -136,8 +136,12 @@ step state delay =
         { state: newState
         , effects:
           [ do
+              _ <- delay (Milliseconds msDelay)
+              {-}
               nextDelay <-
                   later' msDelay $ liftEff (playEvent midiPhrase)
+              -}
+              nextDelay <- liftEff (playEvent midiPhrase)
               pure $ Just (StepMelody nextDelay)
           ]
         }

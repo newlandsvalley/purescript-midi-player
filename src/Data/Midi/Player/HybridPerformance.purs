@@ -10,7 +10,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.Int (toNumber)
-import Prelude (bind, map, pure, ($), (*), (+), (-), (/), (>), (&&))
+import Prelude (bind, discard, map, pure, ($), (*), (+), (-), (/), (>), (&&))
 
 -- | A hybrid performance is one where we don't attempt to interpret
 -- | every MIDI message individually before re-rendering the player
@@ -88,7 +88,7 @@ transformTrack Nil =
     retrieveMelody
 transformTrack (Cons m ms) =
   do
-    transformMessage m
+    _ <- transformMessage m
     transformTrack ms
 
 transformMessage :: Midi.Message -> ControlState.State TransformationState Melody
