@@ -40,4 +40,4 @@ dependencies
 | purescript-midi         | https://github.com/newlandsvalley/purescript-midi.git            |
 | purescript-soundfonts   | https://github.com/newlandsvalley/purescript-soundfonts.git      |
 | purescript-abc-parser   | https://github.com/newlandsvalley/purescript-abc-parser.git      |
-| purescript-pux          | 8.7.0                                                            |
+| purescript-pux          | 9.1.0                                                            |
