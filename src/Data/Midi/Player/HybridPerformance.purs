@@ -10,7 +10,7 @@ import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (unwrap)
 import Data.Int (toNumber)
-import Prelude (bind, discard, map, pure, ($), (*), (+), (-), (/), (>), (&&))
+import Prelude (bind, map, pure, ($), (*), (+), (-), (/), (>), (&&))
 
 -- | A hybrid performance is one where we don't attempt to interpret
 -- | every MIDI message individually before re-rendering the player
