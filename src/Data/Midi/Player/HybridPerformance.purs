@@ -8,9 +8,8 @@ import Data.Array ((:), reverse)
 import Data.List (List(..), head)
 import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.Newtype (unwrap)
 import Data.Int (toNumber)
-import Prelude (bind, map, pure, ($), (*), (+), (-), (/), (>), (&&))
+import Prelude (bind, pure, ($), (*), (+), (-), (/), (>), (&&))
 
 -- | A hybrid performance is one where we don't attempt to interpret
 -- | every MIDI message individually before re-rendering the player
@@ -71,16 +70,16 @@ initialTransformationState ticksPerBeat =
 -- | which is simply an array of MIDI notes, each timed to
 -- | be played at the appropriate time offset
 toPerformance :: Midi.Recording -> Melody
-toPerformance recording =
+toPerformance (Midi.Recording recording) =
   let
-    mtrack0 :: Maybe (List Midi.Message)
-    mtrack0 = map unwrap $ head (unwrap recording).tracks
-    header = unwrap (unwrap recording).header
-    track0 :: List Midi.Message
-    track0 = fromMaybe Nil mtrack0
+    mtrack0 :: Maybe Midi.Track
+    mtrack0 = head recording.tracks
+    Midi.Track track0 = fromMaybe (Midi.Track Nil) mtrack0
+    Midi.Header header = recording.header
   in
     do
       ControlState.evalState (transformTrack track0) (initialTransformationState header.ticksPerBeat)
+
 
 transformTrack :: List Midi.Message -> ControlState.State TransformationState Melody
 transformTrack Nil =
