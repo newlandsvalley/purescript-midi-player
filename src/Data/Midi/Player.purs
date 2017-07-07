@@ -1,5 +1,5 @@
 module Data.Midi.Player
-  (MelodySource, State, Event (SetRecording, SetAbc), initialState, foldp, view) where
+  (MelodySource, State, Event (SetRecording, SetAbc, SetMelody), initialState, foldp, view) where
 
 import CSS.TextAlign
 import Audio.SoundFont (AUDIO, playNotes)
@@ -37,6 +37,7 @@ data Event
   = NoOp
   | SetRecording Recording   -- we can get the melody from a MIDI recoding
   | SetAbc AbcTune           -- or else from an ABC tune
+  | SetMelody Melody         -- or directly from a melody itself
   | StepMelody Number        -- not called directly but its presence allows a view update
   | PlayMelody Boolean       -- play | pause
   | StopMelody               -- stop and set index to zero
@@ -45,6 +46,7 @@ data Event
 data MelodySource
   = ABC AbcTune
   | MIDI Recording
+  | DIRECT  -- straight from a Melody itself
   | ABSENT
 
 -- | the internal state of the player
@@ -80,6 +82,11 @@ setAbcTune abcTune state =
         , melody = []
         }
 
+-- | set the source of the melody directly as a Melody itself (needing no transformation)
+setMelody :: Melody -> State -> State
+setMelody melody state =
+  state { melody = melody  }
+
 -- | truly establish the melody only once the play button is pressed
 -- | for the first time
 establishMelody :: Boolean -> State -> State
@@ -98,6 +105,12 @@ establishMelody playing state =
           max = length melody
         in
           state { melody = melody, playing = playing, phraseMax = max, phraseIndex = 0 }
+      DIRECT ->
+        -- the melody is already written directly to state
+        let
+          max = length state.melody
+        in
+          state { playing = playing, phraseMax = max, phraseIndex = 0 }
       ABSENT ->
         state
   else
@@ -110,6 +123,8 @@ foldp (SetRecording recording) state =
   noEffects $ setMidiRecording recording state
 foldp (SetAbc abcTune) state =
   noEffects $ setAbcTune abcTune state
+foldp (SetMelody melody) state =
+  noEffects $ setMelody melody state
 foldp (StepMelody delay) state =
   step state delay
 foldp (PlayMelody playing) state =
