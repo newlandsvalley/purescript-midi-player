@@ -3,13 +3,13 @@ module App where
 import CSS.TextAlign
 import Data.Midi as Midi
 import Data.Midi.Player as MidiPlayer
-import Audio.SoundFont (AUDIO, loadRemoteSoundFont)
+import Audio.SoundFont (AUDIO, LoadResult, loadRemoteSoundFont)
 import BinaryFileIO.FileIO (FILEIO, Filespec, loadBinaryFile)
 import Data.Either (Either(..))
 import Data.Function (const, ($), (#))
 import Data.Maybe (Maybe(..))
 import Data.Midi.Parser (parse, normalise, translateRunningStatus)
-import Prelude (bind, discard, pure, (<<<))
+import Prelude (bind, discard, negate, pure, (<<<), (>=))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
 import Pux.DOM.HTML (HTML, child)
@@ -23,7 +23,7 @@ import Text.Smolder.Markup (Attribute, text, (#!), (!))
 data Event
   = NoOp
   | RequestLoadFonts
-  | FontLoaded Boolean
+  | FontLoaded LoadResult
   | RequestFileUpload
   | FileLoaded Filespec
   | PlayerEvent MidiPlayer.Event
@@ -31,7 +31,7 @@ data Event
 type State =
   { filespec :: Maybe Filespec
   , recording :: Either String Midi.Recording
-  , fontLoaded :: Boolean                 -- is the soundfount loaded?
+  , fontLoad :: LoadResult              -- is the soundfount loaded?
   , playerState :: Maybe MidiPlayer.State
   }
 
@@ -39,7 +39,7 @@ initialState :: State
 initialState =
   { filespec : Nothing
   , recording : Left "not started"
-  , fontLoaded : false
+  , fontLoad : { instrument : "unknown", channel : (-1) }
   , playerState : Nothing
   }
 
@@ -54,7 +54,7 @@ foldp RequestLoadFonts state =
      ]
   }
 foldp (FontLoaded loaded) state =
-  noEffects $ state { fontLoaded = loaded }
+  noEffects $ state { fontLoad = loaded }
 foldp RequestFileUpload state =
  { state: state
    , effects:
@@ -104,10 +104,14 @@ processFile filespec state =
               , playerState = Nothing
               }
 
+-- | not ideal.  At the moment we don't catch errors from fonts that don't load
+isFontLoaded :: State -> Boolean
+isFontLoaded state =
+  state.fontLoad.channel >= 0
 
 view :: State -> HTML Event
 view state =
-  if (state.fontLoaded) then
+  if (isFontLoaded state) then
      div  do
        h1 ! centreStyle $ text "play a MIDI file"
        div do
