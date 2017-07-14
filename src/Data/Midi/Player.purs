@@ -85,13 +85,14 @@ setAbcTune abcTune state =
 -- | set the source of the melody directly as a Melody itself (needing no transformation)
 setMelody :: Melody -> State -> State
 setMelody melody state =
-  state { melody = melody  }
+  state { melodySource = DIRECT
+        , melody = melody
+        }
 
 -- | truly establish the melody only once the play button is pressed
 -- | for the first time
 establishMelody :: Boolean -> State -> State
 establishMelody playing state =
-  -- if (null state.melody) then
     case state.melodySource of
       MIDI recording ->
         let
@@ -113,8 +114,6 @@ establishMelody playing state =
           state { playing = playing, phraseMax = max, phraseIndex = 0 }
       ABSENT ->
         state
-  -- else
-  --  state { playing = playing }
 
 -- | the autonomous state update
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
