@@ -91,7 +91,7 @@ setMelody melody state =
 -- | for the first time
 establishMelody :: Boolean -> State -> State
 establishMelody playing state =
-  if (null state.melody) then
+  -- if (null state.melody) then
     case state.melodySource of
       MIDI recording ->
         let
@@ -113,8 +113,8 @@ establishMelody playing state =
           state { playing = playing, phraseMax = max, phraseIndex = 0 }
       ABSENT ->
         state
-  else
-    state { playing = playing }
+  -- else
+  --  state { playing = playing }
 
 -- | the autonomous state update
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
