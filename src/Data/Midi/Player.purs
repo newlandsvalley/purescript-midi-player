@@ -1,7 +1,7 @@
 module Data.Midi.Player
-  (MelodySource, State, Event (SetRecording, SetAbc, SetMelody), initialState, foldp, view) where
+  (MelodySource, PlaybackState, State, Event (SetRecording, SetAbc, SetMelody), initialState, foldp, view) where
 
-import CSS.TextAlign
+import CSS.TextAlign (center, textAlign)
 import Audio.SoundFont (AUDIO, playNotes)
 import CSS (color, fromString)
 import CSS.Background (background, backgroundImages)
@@ -22,15 +22,17 @@ import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Data.Midi (Recording)
 import Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance)
-import Prelude (bind, const, discard, negate, not, show, pure, (<<<), (==), ($), (+), (*), (&&), (||))
+import Prelude (class Show, class Eq, bind, const, discard, negate, not, show, pure, (<<<), (==), (>), ($), (+), (*), (&&), (||))
 import Pux (EffModel, noEffects)
 import Pux.DOM.Events (onClick)
 import Pux.DOM.HTML (HTML)
 import Pux.DOM.HTML.Attributes (style)
 import Text.Smolder.HTML (div, input, progress)
-import Text.Smolder.HTML.Attributes (type', max, src, value)
-import Text.Smolder.Markup (Attribute, text, (#!), (!))
-
+import Text.Smolder.HTML.Attributes (type', disabled, max, src, value)
+import Text.Smolder.Markup (Attribute, text, (#!), (!), (!?))
+import Data.Generic.Rep (class Generic)
+import Data.Generic.Rep.Eq (genericEq)
+import Data.Generic.Rep.Show (genericShow)
 
 -- | Player events,  Only SetMelody is exposed.
 data Event
@@ -39,7 +41,8 @@ data Event
   | SetAbc AbcTune           -- or else from an ABC tune
   | SetMelody Melody         -- or directly from a melody itself
   | StepMelody Number        -- not called directly but its presence allows a view update
-  | PlayMelody Boolean       -- play | pause
+  | PlayMelody PlaybackState -- play | pause
+  | EnablePlayButton         -- re-enable the pause/play button (after a pause)
   | StopMelody               -- stop and set index to zero
 
 -- | the source of the melody
@@ -53,19 +56,33 @@ data MelodySource
 type State =
   { melodySource :: MelodySource
   , melody :: Melody
-  , playing :: Boolean
+  , playing :: PlaybackState
   , phraseMax :: Int
   , phraseIndex :: Int
+  , lastPhraseLength :: Number
   }
+
+-- | now we have tri-state logic for playback state because of the pending status
+data PlaybackState =
+    PLAYING           -- the melody is playing
+  | PENDINGPAUSED     -- the pause button has been hit, but the phrase is stil finishing
+  | PAUSED            -- the melody is not playing  (paused or stopped)
+
+derive instance genericPlaybackState :: Generic PlaybackState _
+instance showEvent :: Show PlaybackState where
+  show = genericShow
+instance eqEvent :: Eq PlaybackState where
+  eq = genericEq
 
 -- | the initial state of the player (with no melody to play yet)
 initialState :: State
 initialState =
   { melodySource : ABSENT
   , melody : []
-  , playing : false
+  , playing : PAUSED
   , phraseMax : 0
   , phraseIndex : 0
+  , lastPhraseLength : 0.0
   }
 
 -- | set the source of the melody as a MIDI recording
@@ -91,7 +108,7 @@ setMelody melody state =
 
 -- | truly establish the melody only once the play button is pressed
 -- | for the first time
-establishMelody :: Boolean -> State -> State
+establishMelody :: PlaybackState -> State -> State
 establishMelody playing state =
     case state.melodySource of
       MIDI recording ->
@@ -127,14 +144,21 @@ foldp (SetMelody melody) state =
 foldp (StepMelody delay) state =
   step state delay
 foldp (PlayMelody playing) state =
-  if (playing && state.phraseIndex == 0) then
+  if ((playing == PLAYING) && state.phraseIndex == 0) then
+    -- start
     -- actually establish the melody on first reference
     step (establishMelody playing state) 0.0
-  else
+  else if ((playing == PLAYING) && state.phraseIndex > 0) then
+    -- restart
     step (state { playing = playing }) 0.0
+  else
+    -- pause
+    temporarilyFreezePlayButton (state { playing = PENDINGPAUSED })
 foldp (StopMelody) state =
   noEffects $ state { phraseIndex = 0
-                    , playing = false }
+                    , playing = PAUSED }
+foldp EnablePlayButton state =
+  noEffects $ state { playing = PAUSED }
 
 -- | step through the MIDI events, one by one
 step :: forall e. State -> Number -> EffModel State Event (au :: AUDIO | e)
@@ -145,22 +169,35 @@ step state sDelay =
         msDelay = sDelay * 1000.0
         -- set the new state
         newState =
-          state { phraseIndex = state.phraseIndex + 1 }
+          state { phraseIndex = state.phraseIndex + 1
+                , lastPhraseLength = sDelay
+                }
       in
         { state: newState
         , effects:
           [ do
               _ <- delay (Milliseconds msDelay)
-              {-}
-              nextDelay <-
-                  later' msDelay $ liftEff (playEvent midiPhrase)
-              -}
               nextDelay <- liftEff (playEvent midiPhrase)
               pure $ Just (StepMelody nextDelay)
           ]
         }
     _ ->
       noEffects state
+
+-- | the pause button is unresponsive.  The playback only pauses when the current
+-- | phrase finishes playing. So temporarily freeze the play button.
+temporarilyFreezePlayButton :: forall e. State -> EffModel State Event (au :: AUDIO | e)
+temporarilyFreezePlayButton state =
+  let
+    msDelay = state.lastPhraseLength * 1000.0
+  in
+    { state: state
+    , effects:
+      [ do
+          _ <- delay (Milliseconds msDelay)
+          pure $ Just EnablePlayButton
+      ]
+    }
 
 -- | play a MIDI Phrase (a bunch of MIDI notes)
 -- | only NoteOn events produce sound
@@ -171,7 +208,7 @@ playEvent midiPhrase =
 -- | locate the next MIDI phrase from the performance
 locateNextPhrase :: State -> Maybe MidiPhrase
 locateNextPhrase state =
-  if (not state.playing) || (null state.melody) then
+  if (not (state.playing == PLAYING)) || (null state.melody) then
     Nothing
   else
     index state.melody (state.phraseIndex)
@@ -185,20 +222,25 @@ player :: State -> HTML Event
 player state =
   let
     sliderPos = show state.phraseIndex
+    -- the play button is temporarily disabled after a pause command
+    isDisabled = (state.playing == PENDINGPAUSED)
 
     startImg = "assets/images/play.png"
     stopImg =  "assets/images/stop.png"
     pauseImg = "assets/images/pause.png"
+    -- the action reverses the PLAYING - PAUSED status
     playAction =
-      if state.playing then
-         PlayMelody false
+      if (state.playing == PLAYING) then
+         PlayMelody PAUSED
       else
-         PlayMelody true
+         PlayMelody PLAYING
     playButtonImg =
-      if state.playing then
-        pauseImg
-      else
+      if (state.playing == PAUSED) then
         startImg
+      else
+        -- the pause image is displayed both if the tune is to be PlayMelody
+        -- or else if it is disabled pending a pause
+        pauseImg
     capsuleMax =
       show state.phraseMax
   in
@@ -207,7 +249,8 @@ player state =
             progress ! capsuleStyle ! max capsuleMax ! value sliderPos $ do
               text ""
             div ! buttonStyle $ do
-              input ! type' "image" ! src playButtonImg
+              -- input ! type' "image" ! src playButtonImg
+              (input !? isDisabled) (disabled "disabled") ! type' "image" ! src playButtonImg
                  #! onClick (const playAction)
               input ! type' "image" ! src stopImg
                  #! onClick (const StopMelody)
