@@ -155,8 +155,13 @@ foldp (PlayMelody playing) state =
     -- pause
     temporarilyFreezePlayButton (state { playing = PENDINGPAUSED })
 foldp (StopMelody) state =
+  {-}
   noEffects $ state { phraseIndex = 0
                     , playing = PAUSED }
+  -}
+  -- pause
+  temporarilyFreezePlayButton (state { phraseIndex = 0
+                                     , playing = PENDINGPAUSED })
 foldp EnablePlayButton state =
   noEffects $ state { playing = PAUSED }
 
@@ -222,7 +227,7 @@ player :: State -> HTML Event
 player state =
   let
     sliderPos = show state.phraseIndex
-    -- the play button is temporarily disabled after a pause command
+    -- the buttons are temporarily disabled after a pause command
     isDisabled = (state.playing == PENDINGPAUSED)
 
     startImg = "assets/images/play.png"
@@ -244,16 +249,15 @@ player state =
     capsuleMax =
       show state.phraseMax
   in
-        div ! playerBlockStyle $ do
-          div ! playerBaseStyle ! playerStyle $ do
-            progress ! capsuleStyle ! max capsuleMax ! value sliderPos $ do
-              text ""
-            div ! buttonStyle $ do
-              -- input ! type' "image" ! src playButtonImg
-              (input !? isDisabled) (disabled "disabled") ! type' "image" ! src playButtonImg
-                 #! onClick (const playAction)
-              input ! type' "image" ! src stopImg
-                 #! onClick (const StopMelody)
+    div ! playerBlockStyle $ do
+      div ! playerBaseStyle ! playerStyle $ do
+        progress ! capsuleStyle ! max capsuleMax ! value sliderPos $ do
+          text ""
+        div ! buttonStyle $ do
+          (input !? isDisabled) (disabled "disabled") ! type' "image" ! src playButtonImg
+             #! onClick (const playAction)
+          (input !? isDisabled) (disabled "disabled") ! type' "image" ! src stopImg
+             #! onClick (const StopMelody)
 
 centreStyle :: Attribute
 centreStyle =
