@@ -1,5 +1,5 @@
 module Data.Midi.Player
-  (MelodySource, PlaybackState, State, Event (SetRecording, SetAbc, SetMelody), initialState, foldp, view) where
+  (MelodySource, PlaybackState(..), State, Event (SetRecording, SetAbc, SetMelody), initialState, foldp, view) where
 
 import CSS.TextAlign (center, textAlign)
 import Audio.SoundFont (AUDIO, playNotes)
