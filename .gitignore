@@ -6,3 +6,4 @@
 /.psc*
 /.psa*
 /dist/midi-player.js
+/editor/dist/psom-editor.js

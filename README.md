@@ -35,9 +35,9 @@ to build the example
 dependencies
 ------------
 
-| Module                  | Reference                                                        |
-| ----------------------- | ---------------------------------------------------------------- |
-| purescript-midi         | https://github.com/newlandsvalley/purescript-midi.git            |
-| purescript-soundfonts   | https://github.com/newlandsvalley/purescript-soundfonts.git      |
-| purescript-abc-parser   | https://github.com/newlandsvalley/purescript-abc-parser.git      |
-| purescript-pux          | 9.1.0                                                            |
+| Module                  | Reference                                                              |
+| ----------------------- | ---------------------------------------------------------------------- |
+| purescript-midi         | https://github.com/newlandsvalley/purescript-midi.git                  |
+| purescript-soundfonts   | https://github.com/newlandsvalley/purescript-polyphonic-soundfonts.git |
+| purescript-abc-parser   | https://github.com/newlandsvalley/purescript-abc-parser.git            |
+| purescript-pux          | 9.1.0                                                                  |
