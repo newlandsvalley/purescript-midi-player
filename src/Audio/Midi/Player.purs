@@ -1,5 +1,5 @@
 module Audio.Midi.Player
-  (MelodySource(..), State, Event (SetRecording), initialState, foldp, view) where
+  (MelodySource(..), State, Event (SetRecording, SetAbc), initialState, foldp, view) where
 
 import Prelude ((&&), (==))
 import Data.Midi (Recording) as Midi
