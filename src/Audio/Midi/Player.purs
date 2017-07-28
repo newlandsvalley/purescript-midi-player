@@ -1,5 +1,5 @@
 module Audio.Midi.Player
-  (MelodySource(..), State, Event (SetRecording, SetAbc), PlaybackState(..), initialState, foldp, view) where
+  (MelodySource(..), State, Event (SetRecording, SetAbc), initialState, foldp, view) where
 
 import Prelude ((&&), (==))
 import Data.Midi (Recording) as Midi
@@ -14,8 +14,6 @@ import Audio.Midi.HybridPerformance (toPerformance)
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.HTML (HTML, mapEvent)
 
--- | experiment with re-export
-type PlaybackState = BasePlayer.PlaybackState
 
 data MelodySource =
     MIDI Midi.Recording
