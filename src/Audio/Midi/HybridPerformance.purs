@@ -1,8 +1,8 @@
-module Data.Midi.Player.HybridPerformance (Melody, MidiPhrase, toPerformance) where
+module Audio.Midi.HybridPerformance (toPerformance) where
 
 import Control.Monad.State as ControlState
-import Audio.SoundFont (MidiNote)
 import Data.Midi as Midi
+import Audio.BasePlayer (Melody, MidiPhrase)
 import Data.Tuple (Tuple(..), fst, snd)
 import Data.Array ((:), reverse)
 import Data.List (List(..), head)
@@ -16,8 +16,6 @@ import Prelude (bind, pure, ($), (*), (+), (-), (/), (>), (&&))
 -- | but we instead group sequences of MIDI messages into
 -- | (relatively short) phrases and re-render after each phrase
 
-type MidiPhrase = Array MidiNote
-type Melody = Array MidiPhrase
 
 -- | a PartialNote comes from MIDI NoteOn
 -- | and is incomplete because it has no end time offset/duration

@@ -2,7 +2,7 @@ module App where
 
 import CSS.TextAlign
 import Data.Midi as Midi
-import Data.Midi.Player as MidiPlayer
+import Audio.Midi.Player as MidiPlayer
 import Audio.SoundFont (AUDIO, LoadResult, loadRemoteSoundFont)
 import BinaryFileIO.FileIO (FILEIO, Filespec, loadBinaryFile)
 import Data.Either (Either(..))
