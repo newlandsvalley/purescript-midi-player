@@ -1,38 +1,45 @@
 module Audio.Midi.Player
-  (State, Event (SetRecording), initialState, foldp, view) where
+  (MelodySource(..), State, Event (SetRecording), initialState, foldp, view) where
 
 import Prelude ((&&), (==))
 import Data.Midi (Recording) as Midi
+import Data.Abc (AbcTune)
+import Data.Abc.Midi (toMidi)
 import Audio.BasePlayer as BasePlayer
-import Data.Either (Either(..))
-import Data.Function (($), (#))
+-- import Data.Either (Either(..))
+import Data.Function (($), (#), (<<<))
 import Data.Array (null)
 import Audio.SoundFont (AUDIO)
 import Audio.Midi.HybridPerformance (toPerformance)
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.HTML (HTML, mapEvent)
 
-data Event
-  = SetRecording Midi.Recording         -- we'll set the melody from the MIDI Recording
+data MelodySource =
+    MIDI Midi.Recording
+  | ABC AbcTune
+  | ABSENT
+
+data Event =
+    SetRecording Midi.Recording         -- we'll set the melody from the MIDI Recording
+  | SetAbc AbcTune                      -- we'll set it from an ABC tune
   | BasePlayerEvent BasePlayer.Event
 
 type State =
-  { recording :: Either String Midi.Recording
+  { melodySource :: MelodySource
   , basePlayerState :: BasePlayer.State
   }
 
 initialState :: State
 initialState =
-  { recording : Left "not started"
+  { melodySource : ABSENT
   , basePlayerState : BasePlayer.initialState
   }
 
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
 foldp (SetRecording recording) state =
-  let
-    bpState = BasePlayer.setMelody [] state.basePlayerState
-  in
-    noEffects $ state { recording = Right recording, basePlayerState = bpState }
+  noEffects $ setMidiRecording recording state
+foldp (SetAbc abcTune) state =
+  noEffects $ setAbcTune abcTune state
 foldp (BasePlayerEvent e) state =
   let
     -- establish the melody only when the Play button is first pressed
@@ -47,6 +54,23 @@ foldp (BasePlayerEvent e) state =
   in
     delegate e newState
 
+-- | set a MIDI recording as the source of the melody
+setMidiRecording :: Midi.Recording -> State -> State
+setMidiRecording recording state =
+  let
+    bpState = BasePlayer.setMelody [] state.basePlayerState
+  in
+    state { melodySource = MIDI recording, basePlayerState = bpState }
+
+
+-- | set an ABC tune as the source of the melody
+setAbcTune :: AbcTune -> State -> State
+setAbcTune abcTune state =
+  let
+    bpState = BasePlayer.setMelody [] state.basePlayerState
+  in
+    state { melodySource = ABC abcTune, basePlayerState = bpState }
+
 -- | delegate to the Base Player
 delegate :: ∀ fx. BasePlayer.Event -> State -> EffModel State Event (au :: AUDIO | fx)
 delegate e state =
@@ -59,9 +83,11 @@ establishMelody :: State -> State
 establishMelody state =
   let
     melody =
-      case state.recording of
-        Right rec ->
-         toPerformance rec
+      case state.melodySource of
+        MIDI recording ->
+          toPerformance recording
+        ABC abcTune ->
+          (toPerformance <<< toMidi) abcTune
         _ ->
          []
     bpState = BasePlayer.setMelody melody state.basePlayerState
