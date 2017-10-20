@@ -4,15 +4,14 @@ import CSS.TextAlign
 import Data.Midi as Midi
 import Data.Midi.Instrument (InstrumentName(..))
 import Audio.Midi.Player as MidiPlayer
-import Audio.SoundFont (AUDIO, Instrument, InstrumentChannels, instrumentChannels, loadRemoteSoundFonts)
+import Audio.SoundFont (AUDIO, Instrument, loadRemoteSoundFonts)
 import JS.FileIO (FILEIO, Filespec, loadBinaryFileAsText)
 import Data.Either (Either(..))
 import Data.Function (const, ($), (#))
 import Data.Maybe (Maybe(..))
-import Data.Map (empty, isEmpty) as Map
 import Data.Array (singleton)
 import Data.Midi.Parser (parse, normalise, translateRunningStatus)
-import Prelude (bind, discard, not, pure, (<<<), (<>))
+import Prelude (bind, discard, pure, (<<<), (<>))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
 import Pux.DOM.HTML (HTML, child)
@@ -35,7 +34,6 @@ data Event
 type State =
   { filespec :: Maybe Filespec
   , recording :: Either String Midi.Recording
-  , channels :: InstrumentChannels
   , playerState :: MidiPlayer.State
   }
 
@@ -43,8 +41,7 @@ initialState :: State
 initialState =
   { filespec : Nothing
   , recording : Left "not started"
-  , channels : Map.empty
-  , playerState : MidiPlayer.initialState
+  , playerState : MidiPlayer.initialState []
   }
 
 foldp :: ∀ fx. Event -> State -> EffModel State Event (ajax :: AJAX, fileio :: FILEIO, au :: AUDIO | fx)
@@ -59,10 +56,9 @@ foldp RequestLoadFonts state =
   }
 foldp (FontsLoaded instruments) state =
   let
-    chans = instrumentChannels instruments
     basePlayerState = MidiPlayer.setInstruments instruments state.playerState
   in
-    noEffects $ state { channels = chans, playerState = basePlayerState }
+    noEffects $ state { playerState = basePlayerState }
 foldp RequestFileUpload state =
  { state: state
    , effects:
@@ -100,7 +96,7 @@ processFile filespec state =
 -- | not ideal.  At the moment we don't catch errors from fonts that don't load
 isFontLoaded :: State -> Boolean
 isFontLoaded state =
-  not $ Map.isEmpty state.channels
+  state.playerState.fontsLoaded
 
 view :: State -> HTML Event
 view state =

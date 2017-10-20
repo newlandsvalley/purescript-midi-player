@@ -1,7 +1,7 @@
 module Audio.Midi.Player
   (MelodySource(..), State, Event (SetRecording, SetAbc), setInstruments, initialState, foldp, view) where
 
-import Prelude ((&&), (==))
+import Prelude ((&&), (==), not)
 import Data.Midi (Recording) as Midi
 import Data.Abc (AbcTune)
 import Data.Abc.Midi (toMidi)
@@ -27,12 +27,14 @@ data Event =
 type State =
   { melodySource :: MelodySource
   , basePlayer :: BasePlayer.State
+  , fontsLoaded :: Boolean
   }
 
-initialState :: State
-initialState =
+initialState :: Array Instrument -> State
+initialState instruments =
   { melodySource : ABSENT
-  , basePlayer : BasePlayer.initialState
+  , basePlayer : BasePlayer.initialState instruments
+  , fontsLoaded : not $ null instruments
   }
 
 foldp :: ∀ fx. Event -> State -> EffModel State Event (au :: AUDIO | fx)
@@ -59,8 +61,9 @@ setInstruments :: Array Instrument -> State -> State
 setInstruments instruments state =
   let
     bpState = BasePlayer.setInstruments instruments state.basePlayer
+    fontsLoaded = not $ null instruments
   in
-    state { basePlayer = bpState }
+    state { basePlayer = bpState, fontsLoaded = fontsLoaded }
 
 -- | set a MIDI recording as the source of the melody
 setMidiRecording :: Midi.Recording -> State -> State
