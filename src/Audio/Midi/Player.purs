@@ -1,15 +1,14 @@
 module Audio.Midi.Player
-  (MelodySource(..), State, Event (SetRecording, SetAbc), initialState, foldp, view) where
+  (MelodySource(..), State, Event (SetRecording, SetAbc), setInstruments, initialState, foldp, view) where
 
 import Prelude ((&&), (==))
 import Data.Midi (Recording) as Midi
 import Data.Abc (AbcTune)
 import Data.Abc.Midi (toMidi)
 import Audio.BasePlayer as BasePlayer
--- import Data.Either (Either(..))
 import Data.Function (($), (#), (<<<))
 import Data.Array (null)
-import Audio.SoundFont (AUDIO)
+import Audio.SoundFont (AUDIO, Instrument)
 import Audio.Midi.HybridPerformance (toPerformance)
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.HTML (HTML, mapEvent)
@@ -54,6 +53,14 @@ foldp (BasePlayerEvent e) state =
         _ -> state
   in
     delegate e newState
+
+-- | set the instrument soundfonts in the base player
+setInstruments :: Array Instrument -> State -> State
+setInstruments instruments state =
+  let
+    bpState = BasePlayer.setInstruments instruments state.basePlayer
+  in
+    state { basePlayer = bpState }
 
 -- | set a MIDI recording as the source of the melody
 setMidiRecording :: Midi.Recording -> State -> State

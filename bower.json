@@ -7,11 +7,8 @@
     "output"
   ],
   "dependencies": {
-    "purescript-midi": "https://github.com/newlandsvalley/purescript-midi.git#1.0.0",
-    "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git#1.0.0",
-    "purescript-soundfonts": "https://github.com/newlandsvalley/purescript-polyphonic-soundfonts.git#1.0.0",
-    "purescript-soundfont-player": "https://github.com/newlandsvalley/purescript-soundfont-player.git#1.0.0",
-    "purescript-pux": "^9.1.0"
+    "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git#1.1.1",
+    "purescript-soundfont-player": "https://github.com/newlandsvalley/purescript-soundfont-player.git#1.1.2"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

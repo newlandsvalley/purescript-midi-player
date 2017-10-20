@@ -2,14 +2,17 @@ module App where
 
 import CSS.TextAlign
 import Data.Midi as Midi
+import Data.Midi.Instrument (InstrumentName(..))
 import Audio.Midi.Player as MidiPlayer
-import Audio.SoundFont (AUDIO, LoadResult, loadRemoteSoundFont)
-import BinaryFileIO.FileIO (FILEIO, Filespec, loadBinaryFile)
+import Audio.SoundFont (AUDIO, Instrument, InstrumentChannels, instrumentChannels, loadRemoteSoundFonts)
+import JS.FileIO (FILEIO, Filespec, loadBinaryFileAsText)
 import Data.Either (Either(..))
 import Data.Function (const, ($), (#))
 import Data.Maybe (Maybe(..))
+import Data.Map (empty, isEmpty) as Map
+import Data.Array (singleton)
 import Data.Midi.Parser (parse, normalise, translateRunningStatus)
-import Prelude (bind, discard, negate, pure, (<<<), (>=))
+import Prelude (bind, discard, not, pure, (<<<), (<>))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
 import Pux.DOM.HTML (HTML, child)
@@ -17,13 +20,14 @@ import Pux.DOM.HTML.Attributes (style)
 import Text.Smolder.HTML (button, div, h1, input, p)
 import Text.Smolder.HTML.Attributes (type', id, accept)
 import Text.Smolder.Markup (Attribute, text, (#!), (!))
+import Network.HTTP.Affjax (AJAX)
 
 -- import Debug.Trace (trace)
 
 data Event
   = NoOp
   | RequestLoadFonts
-  | FontLoaded LoadResult
+  | FontsLoaded (Array Instrument)
   | RequestFileUpload
   | FileLoaded Filespec
   | PlayerEvent MidiPlayer.Event
@@ -31,35 +35,39 @@ data Event
 type State =
   { filespec :: Maybe Filespec
   , recording :: Either String Midi.Recording
-  , fontLoad :: LoadResult              -- is the soundfount loaded?
-  , playerState :: Maybe MidiPlayer.State
+  , channels :: InstrumentChannels
+  , playerState :: MidiPlayer.State
   }
 
 initialState :: State
 initialState =
   { filespec : Nothing
   , recording : Left "not started"
-  , fontLoad : { instrument : "unknown", channel : (-1) }
-  , playerState : Nothing
+  , channels : Map.empty
+  , playerState : MidiPlayer.initialState
   }
 
-foldp :: ∀ fx. Event -> State -> EffModel State Event (fileio :: FILEIO, au :: AUDIO | fx)
+foldp :: ∀ fx. Event -> State -> EffModel State Event (ajax :: AJAX, fileio :: FILEIO, au :: AUDIO | fx)
 foldp NoOp state =  noEffects $ state
 foldp RequestLoadFonts state =
  { state: state
    , effects:
      [ do
-         loaded <- loadRemoteSoundFont "acoustic_grand_piano"
-         pure $ Just (FontLoaded loaded)
+         instruments <- loadRemoteSoundFonts (singleton AcousticGrandPiano)
+         pure $ Just (FontsLoaded instruments)
      ]
   }
-foldp (FontLoaded loaded) state =
-  noEffects $ state { fontLoad = loaded }
+foldp (FontsLoaded instruments) state =
+  let
+    chans = instrumentChannels instruments
+    basePlayerState = MidiPlayer.setInstruments instruments state.playerState
+  in
+    noEffects $ state { channels = chans, playerState = basePlayerState }
 foldp RequestFileUpload state =
  { state: state
    , effects:
      [ do
-         filespec <- loadBinaryFile
+         filespec <- loadBinaryFileAsText "fileinput"
          pure $ Just (FileLoaded filespec)
      ]
  }
@@ -78,36 +86,21 @@ foldp (FileLoaded filespec) state =
       _ ->
         noEffects newState
 foldp (PlayerEvent e) state =
-  case state.playerState of
-    Just pstate ->
-      MidiPlayer.foldp e pstate
+      MidiPlayer.foldp e state.playerState
         # mapEffects PlayerEvent
-        # mapState \pst -> state { playerState = Just pst }
-    _ ->
-      noEffects state
+        # mapState \pst -> state { playerState = pst }
 
 -- | get the MIDI recording and parse it
 processFile :: Filespec -> State -> State
 processFile filespec state =
-  let
-    mrecording = (translateRunningStatus <<< parse <<< normalise) filespec.contents
-  in
-    case mrecording of
-      Right recording ->
-        state { filespec = Just filespec
-              , recording = mrecording
-              , playerState = Just (MidiPlayer.initialState)
-              }
-      _ ->
-        state { filespec =  Just filespec
-              , recording = mrecording
-              , playerState = Nothing
-              }
+  state { filespec = Just filespec
+        , recording = (translateRunningStatus <<< parse <<< normalise) filespec.contents
+        }
 
 -- | not ideal.  At the moment we don't catch errors from fonts that don't load
 isFontLoaded :: State -> Boolean
 isFontLoaded state =
-  state.fontLoad.channel >= 0
+  not $ Map.isEmpty state.channels
 
 view :: State -> HTML Event
 view state =
@@ -124,11 +117,11 @@ view state =
 -- | only display the player if we have a MIDI recording
 viewPlayer :: State -> HTML Event
 viewPlayer state =
-  case state.playerState of
-    Just pstate ->
-      child PlayerEvent MidiPlayer.view $ pstate
-    _ ->
-      p $ text ""
+  case state.recording of
+    Right r ->
+      child PlayerEvent MidiPlayer.view $ state.playerState
+    Left e ->
+      p $ text ("Error in recording: "  <> e)
 
 centreStyle :: Attribute
 centreStyle =
