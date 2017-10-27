@@ -8,7 +8,7 @@
   ],
   "dependencies": {
     "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git#1.1.1",
-    "purescript-soundfont-player": "https://github.com/newlandsvalley/purescript-soundfont-player.git#1.1.3"
+    "purescript-soundfont-player": "https://github.com/newlandsvalley/purescript-soundfont-player.git#1.1.4"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"
