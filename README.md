@@ -30,8 +30,8 @@ dependencies
 
 | Module                     | Reference                                                              |
 | -------------------------- | ---------------------------------------------------------------------- |
-| purescript-midi            | https://github.com/newlandsvalley/purescript-midi.git                  |
+| purescript-midi            | 1.2.0                                                                  |
+| purescript-soundfonts      | 2.0.0                                                                  |
 | purescript-abc-parser      | https://github.com/newlandsvalley/purescript-abc-parser.git            |
-| purescript-soundfonts      | https://github.com/newlandsvalley/purescript-polyphonic-soundfonts.git |
 | purescript-soundont_player | https://github.com/newlandsvalley/purescript-soundfont_player.git      |
 | purescript-pux             | 9.1.0                                                                  |
