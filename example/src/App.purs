@@ -10,7 +10,7 @@ import Data.Either (Either(..))
 import Data.Function (const, ($), (#))
 import Data.Maybe (Maybe(..))
 import Data.Array (singleton)
-import Data.Midi.Parser (parse, normalise, translateRunningStatus)
+import Data.Midi.Parser (parse, normalise)
 import Prelude (bind, discard, pure, (<<<), (<>))
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.Events (onClick, onChange)
@@ -90,7 +90,7 @@ foldp (PlayerEvent e) state =
 processFile :: Filespec -> State -> State
 processFile filespec state =
   state { filespec = Just filespec
-        , recording = (translateRunningStatus <<< parse <<< normalise) filespec.contents
+        , recording = (parse <<< normalise) filespec.contents
         }
 
 -- | not ideal.  At the moment we don't catch errors from fonts that don't load

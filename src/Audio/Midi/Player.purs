@@ -9,7 +9,7 @@ import Audio.BasePlayer as BasePlayer
 import Data.Function (($), (#), (<<<))
 import Data.Array (null)
 import Audio.SoundFont (AUDIO, Instrument)
-import Audio.Midi.HybridPerformance (toPerformance)
+import Audio.SoundFont.Melody.Maker (toMelody)
 import Pux (EffModel, noEffects, mapEffects, mapState)
 import Pux.DOM.HTML (HTML, mapEvent)
 
@@ -96,9 +96,9 @@ establishMelody state =
     melody =
       case state.melodySource of
         MIDI recording ->
-          toPerformance recording
+          toMelody recording
         ABC abcTune ->
-          (toPerformance <<< toMidi) abcTune
+          (toMelody <<< toMidi) abcTune
         _ ->
          []
     bpState = BasePlayer.setMelody melody state.basePlayer
