@@ -7,7 +7,7 @@
     "output"
   ],
   "dependencies": {
-    "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git#1.2.0",
+    "purescript-abc-parser": "https://github.com/newlandsvalley/purescript-abc-parser.git#1.2.1",
     "purescript-soundfont-player": "https://github.com/newlandsvalley/purescript-soundfont-player.git#1.2.1"
   },
   "devDependencies": {
